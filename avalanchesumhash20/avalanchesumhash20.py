@@ -2,7 +2,7 @@ import scipy.integrate as spi
 from math import cos
 import warnings
 
-class AvalancheSumHash20:
+class AvalancheSumHash1024:
     def __init__(self, output_length, iterations, modulo_value):
         self.output_length = output_length
         self.iterations = iterations
@@ -51,29 +51,41 @@ class AvalancheSumHash20:
             parts.append(value_str[start:end])
 
         concatenated_value = "".join(parts[num_parts // 2:] + parts[:num_parts // 2])
-        return int(concatenated_value) % self.modulo_value  # Hier wird die Modulo-Operation hinzugefügt
+        return int(concatenated_value) % self.modulo_value
 
-    def encrypt(self, input_text):
-        text_decimal_value = self.convert_text_to_positional_decimal(input_text)
+    def single_round_hash(self, input_text, salt=""):
+        text_decimal_value = self.convert_text_to_positional_decimal(input_text + salt)
         combined_value = text_decimal_value * self.output_length
-        encrypted_value = self.avalanche_sum_hash(combined_value, input_text)
+        encrypted_value = self.avalanche_sum_hash(combined_value, input_text + salt)
         shifted_encrypted_value = self.shift_digits(encrypted_value)
         concatenated_value = self.concatenate_in_pattern(shifted_encrypted_value, 5)
+        concatenated_value %= 10**128
+        return hex(concatenated_value)[2:]
 
-        # Modulo-Operation mit ausreichend großer Zahl
-        concatenated_value %= 10**20
+    def encrypt(self, input_text):
+        rounds_needed = (128 + 31) // 32
+        hash_parts = []
 
-        return concatenated_value
+        for i in range(rounds_needed):
+            salt = str(i * 31337)
+            part = self.single_round_hash(input_text, salt)
+            hash_parts.append(part.zfill(32)[:32])
+
+        full_hash = ''.join(hash_parts)
+        return full_hash[:128]
+
+
 
 if __name__ == "__main__":
     output_length = 79357612835769157957719395357591595
     iterations = 420
     modulo_value = 93537791153957593571955971579179595
 
-    ash20 = AvalancheSumHash20(output_length, iterations, modulo_value)
+    ash1024 = AvalancheSumHash1024(output_length, iterations, modulo_value)
 
     input_text = input("Text: ")
-    encrypted_value = ash20.encrypt(input_text)
+    encrypted_value = ash1024.encrypt(input_text)
 
     print("Eingabe-Text:", input_text)
-    print("Verschlüsselter Wert:", encrypted_value)
+    print("Hash: ")
+    print(encrypted_value)
